@@ -19,31 +19,22 @@ with **zero dependencies** beyond git and Python.
 
 ## Demo
 
-<!-- Render docs/demo.gif from demo.tape with `vhs demo.tape`, then:
-     ![demo](docs/demo.gif) -->
+![CodePulse demo](docs/demo.gif)
 
 ```console
 $ codepulse . --badge
 Grade: B (83/100)
-  -2 bus factor (9 fichiers à auteur unique)
-  -15 pression hotspots en hausse
-![code health](https://img.shields.io/badge/code%20health-B%20(83)-green)
 
 $ codepulse . --changed origin/main
-🔴 Release risk: HIGH (100/100)
-   56 changed files · 2 high-risk
-   [100] crates/ui-egui/src/lib.rs  (hotspot majeur)
-   [ 70] crates/layout/src/para.rs  (zone active, auteur unique)
-   👥 Relecteurs suggérés: Valentin Klein (29/37 fichiers), Dmitrii Khlapov (22/37)
+Release risk: HIGH (100/100)
+   [100] crates/ui-egui/src/lib.rs   (major hotspot)
+   Reviewers: Valentin Klein (29/37), Dmitrii Khlapov (22/37)
 
 $ codepulse . --who crates/ui-egui/src/canvas.rs
-crates/ui-egui/src/canvas.rs — 64 commits, 22 auteur(s), dernier changement 2026-10-12
-   45%   29 commits  Valentin Klein
-   11%    7 commits  Dmitrii Khlapov
+canvas.rs — 64 commits, 22 authors — 45% Valentin Klein
 ```
 
-> A recordable [`demo.tape`](demo.tape) (for [VHS](https://github.com/charmbracelet/vhs))
-> generates an animated `docs/demo.gif` of the above.
+> The GIF is generated from [`demo.tape`](demo.tape) ([VHS](https://github.com/charmbracelet/vhs)).
 
 ---
 
