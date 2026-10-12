@@ -61,18 +61,24 @@ or email to your team.
 
 ---
 
+## Install
+
+```bash
+pip install codepulse-cli    # installs the `codepulse` command
+```
+
 ## Quick start
 
 ```bash
 # From a git repository:
-python -m codepulse /path/to/repo --open
+codepulse /path/to/repo --open
 
 # Common options:
-python -m codepulse . --since "6 months ago" --top 30 -o health.html
+codepulse . --since "6 months ago" --top 30 -o health.html
 ```
 
-> Running from the source checkout? Prefix with `PYTHONPATH=src`, or install it:
-> `pip install -e .` then just run `codepulse`.
+> Running from a source checkout instead? Use `python -m codepulse` with
+> `PYTHONPATH=src`, or `pip install -e .`.
 
 ### Options
 
