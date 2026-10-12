@@ -72,6 +72,18 @@ def normalize_path(path: str) -> str:
     return path.strip()
 
 
+def get_changed_files(repo: str, ref_range: str) -> list[str]:
+    """Return files changed for a diff spec.
+
+    Accepts either a range ("main..HEAD", "main...HEAD") or a single ref
+    ("origin/main", "HEAD~5"). A single ref is compared against the current
+    working tree, so uncommitted changes count too — which is what a CI job or
+    a pre-commit check usually wants.
+    """
+    out = _run_git(repo, ["diff", "--name-only", ref_range])
+    return [normalize_path(line) for line in out.splitlines() if line.strip()]
+
+
 def get_commits(repo: str, since: str | None = None, max_count: int | None = None) -> list[Commit]:
     """Return commits (newest first), excluding merges.
 

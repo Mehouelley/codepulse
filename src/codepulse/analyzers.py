@@ -144,6 +144,74 @@ def coupling(
 
 
 @dataclass
+class ChangedFileRisk:
+    path: str
+    risk: int  # 0-100
+    commits: int
+    loc: int
+    reasons: list[str]
+
+
+@dataclass
+class ReleaseRisk:
+    """Risk of shipping a specific set of changed files.
+
+    A release is treated as roughly as risky as its riskiest file, with the
+    count of high-risk files raising the overall level — this maps directly to
+    DORA's change-failure-rate concern.
+    """
+
+    files: list[ChangedFileRisk]
+    score: int  # 0-100, overall
+    level: str  # LOW | MEDIUM | HIGH
+    high_risk_count: int
+
+
+_HIGH, _MEDIUM = 70, 40
+
+
+def _level(score: int) -> str:
+    if score >= _HIGH:
+        return "HIGH"
+    if score >= _MEDIUM:
+        return "MEDIUM"
+    return "LOW"
+
+
+def release_risk(changed: list[str], stats: dict[str, FileStat]) -> ReleaseRisk:
+    """Score a set of changed paths against the repo's accumulated risk map."""
+    max_score = max((s.hotspot_score for s in stats.values() if s.exists), default=0)
+
+    files: list[ChangedFileRisk] = []
+    for path in changed:
+        stat = stats.get(path)
+        if stat is None or not stat.exists:
+            # New or untracked file: no history to judge it by.
+            files.append(ChangedFileRisk(path=path, risk=0, commits=0, loc=0, reasons=["nouveau / sans historique"]))
+            continue
+
+        risk = round(stat.hotspot_score / max_score * 100) if max_score else 0
+        reasons: list[str] = []
+        if risk >= _HIGH:
+            reasons.append("hotspot majeur")
+        elif risk >= _MEDIUM:
+            reasons.append("zone active")
+        if stat.commits >= 3 and stat.num_authors == 1:
+            owner = stat.main_owner[0]
+            reasons.append(f"auteur unique ({owner})")
+            risk = min(100, risk + 10)  # single-owner changes are riskier to review
+        files.append(ChangedFileRisk(path=path, risk=risk, commits=stat.commits, loc=stat.loc, reasons=reasons or ["—"]))
+
+    files.sort(key=lambda f: f.risk, reverse=True)
+    score = files[0].risk if files else 0
+    high = sum(1 for f in files if f.risk >= _HIGH)
+    # Several risky files in one release pushes the ceiling up a tier.
+    if high >= 2:
+        score = max(score, _HIGH)
+    return ReleaseRisk(files=files, score=score, level=_level(score), high_risk_count=high)
+
+
+@dataclass
 class Summary:
     total_commits: int
     tracked_files: int
