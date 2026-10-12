@@ -1,0 +1,52 @@
+name: CodePulse risk gate
+
+# Scores what each pull request changes against the repo's history and posts
+# the result as a sticky PR comment. Fails the check on HIGH risk.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  risk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history is required to build the risk map
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install CodePulse
+        run: pip install -e .
+
+      - name: Build risk comment
+        run: |
+          codepulse . --changed "origin/${{ github.base_ref }}" \
+            --format markdown > comment.md
+          cat comment.md
+
+      - name: Post sticky PR comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # Update our previous comment if one exists, else create it.
+          id=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" \
+                 --jq '.[] | select(.body | startswith("<!-- codepulse -->")) | .id' \
+               | head -1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH \
+              "repos/${{ github.repository }}/issues/comments/$id" \
+              -f body="$(cat comment.md)" >/dev/null
+          else
+            gh pr comment "$PR" --body-file comment.md
+          fi
+
+      - name: Enforce risk gate
+        run: codepulse . --changed "origin/${{ github.base_ref }}" --fail-on HIGH

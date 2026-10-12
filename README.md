@@ -80,20 +80,17 @@ Output (JSON):
 
 ### GitHub Actions
 
-```yaml
-name: CodePulse risk gate
-on: [pull_request]
-jobs:
-  risk:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }   # full history is required
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: pip install git+https://github.com/you/codepulse.git
-      - run: codepulse . --changed origin/${{ github.base_ref }} --fail-on HIGH
-```
+A ready-to-use workflow ships in [`.github/workflows/codepulse.yml`](.github/workflows/codepulse.yml).
+On every pull request it scores the change, posts a **sticky comment** (updated
+in place, never spammed), and fails the check on `HIGH` risk:
+
+> 🩺 **CodePulse — Risque : 🔴 HIGH (100/100)**
+> 38 fichiers modifiés · 1 à risque élevé
+> | Risque | Fichier | Pourquoi |
+> |---:|---|---|
+> | 100 | `crates/ui-egui/src/lib.rs` | hotspot majeur |
+
+Drop the file into any repository to enable it — no extra configuration.
 
 **Why DevOps cares:** a release is roughly as risky as its riskiest file.
 Touching a well-known hotspot — or a file only one person understands — is
@@ -120,10 +117,10 @@ simple enough to run in one command.
 ## Roadmap
 
 - [x] Risk gate: score a change set, JSON output, CI exit code
+- [x] Ignore globs / path filters for generated & data files
+- [x] Post the gate result as a sticky PR comment (GitHub Action)
 - [ ] Real complexity metrics per language (beyond line count)
 - [ ] Trend over time (is debt rising or falling?)
-- [ ] Post the gate result as a PR comment (GitHub Action)
-- [ ] Ignore globs / path filters
 
 ## License
 

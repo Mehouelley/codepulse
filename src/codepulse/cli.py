@@ -41,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     gate = parser.add_argument_group("risk gate (CI)")
     gate.add_argument("--changed", metavar="REF",
                       help='score files changed since REF (e.g. "origin/main" or "HEAD~10..HEAD")')
-    gate.add_argument("--format", choices=["text", "json"], default="text",
+    gate.add_argument("--format", choices=["text", "json", "markdown"], default="text",
                       help="risk-gate output format (default: text)")
     gate.add_argument("--fail-on", choices=["LOW", "MEDIUM", "HIGH"],
                       help="exit with code 1 if release risk reaches this level")
@@ -91,6 +91,8 @@ def _run_gate(repo: str, args: argparse.Namespace) -> int:
     changed = [p for p in get_changed_files(repo, args.changed) if not analyzers.is_ignored(p, patterns)]
     risk = analyzers.release_risk(changed, stats)
 
+    icons = {"HIGH": "🔴", "MEDIUM": "🟠", "LOW": "🟢"}
+
     if args.format == "json":
         payload = {
             "level": risk.level,
@@ -103,9 +105,29 @@ def _run_gate(repo: str, args: argparse.Namespace) -> int:
             ],
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
+    elif args.format == "markdown":
+        # A sticky PR comment. The marker lets a CI step find and update it.
+        lines = [
+            "<!-- codepulse -->",
+            f"## 🩺 CodePulse — Risque : {icons[risk.level]} **{risk.level}** ({risk.score}/100)",
+            "",
+            f"**{len(risk.files)} fichiers modifiés · {risk.high_risk_count} à risque élevé**",
+            "",
+        ]
+        scored = [f for f in risk.files if f.risk > 0]
+        if scored:
+            lines += ["| Risque | Fichier | Pourquoi |", "|---:|---|---|"]
+            for f in scored[:12]:
+                lines.append(f"| {f.risk} | `{f.path}` | {', '.join(f.reasons)} |")
+        else:
+            lines.append("_Aucun fichier à risque touché._ ✅")
+        lines += [
+            "",
+            "<sub>Score basé sur l'historique du dépôt. Risque élevé = touche un hotspot connu ou un fichier à auteur unique.</sub>",
+        ]
+        print("\n".join(lines))
     else:
-        icon = {"HIGH": "🔴", "MEDIUM": "🟠", "LOW": "🟢"}[risk.level]
-        print(f"{icon} Release risk: {risk.level} ({risk.score}/100)")
+        print(f"{icons[risk.level]} Release risk: {risk.level} ({risk.score}/100)")
         print(f"   {len(risk.files)} changed files · {risk.high_risk_count} high-risk")
         for f in risk.files:
             if f.risk > 0:
