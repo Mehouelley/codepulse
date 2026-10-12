@@ -25,6 +25,10 @@ DEFAULT_IGNORE: tuple[str, ...] = (
     "pnpm-lock.yaml", "poetry.lock", "composer.lock", "Gemfile.lock",
     "*.tsv", "*.csv",
     "*.min.js", "*.min.css", "*.map", "*.snap",
+    # Binary assets: real churn, but no code health to measure.
+    "*.ttf", "*.otf", "*.woff", "*.woff2", "*.eot",
+    "*.png", "*.jpg", "*.jpeg", "*.gif", "*.ico", "*.svg", "*.webp", "*.pdf",
+    "*.zip", "*.gz", "*.jar", "*.mp3", "*.mp4", "*.wav",
     "node_modules/*", "*/node_modules/*",
     "dist/*", "*/dist/*", "build/*", "*/build/*",
     "vendor/*", "*/vendor/*", "*/.next/*",
@@ -277,6 +281,82 @@ def suggested_reviewers(changed: list[str], stats: dict[str, FileStat], limit: i
     ]
     reviewers.sort(key=lambda r: (r.files_known, r.commits), reverse=True)
     return len(known), reviewers[:limit]
+
+
+@dataclass
+class StaleFile:
+    path: str
+    complexity: int
+    days_stale: int
+    main_owner: tuple
+
+
+def stale_risks(stats: dict[str, FileStat], now_ts: int, limit: int = 15) -> list[StaleFile]:
+    """Complex files nobody has touched in a long time.
+
+    Important logic that is quietly aging: still complex, but in the older half
+    of the repo's recency range — the kind of code that breaks when someone
+    finally has to change it and no one remembers how it works.
+    """
+    present = [s for s in stats.values() if s.exists and s.complexity > 1 and s.last_timestamp]
+    if len(present) < 4:
+        return []
+    comps = sorted(s.complexity for s in present)
+    median_cx = comps[len(comps) // 2]
+    max_days = max((now_ts - s.last_timestamp) for s in present) / 86400 or 1
+
+    out: list[StaleFile] = []
+    for s in present:
+        days = (now_ts - s.last_timestamp) / 86400
+        if s.complexity >= median_cx and days >= max_days * 0.5:
+            out.append(StaleFile(s.path, s.complexity, int(days), s.main_owner))
+    out.sort(key=lambda f: f.complexity * (f.days_stale + 1), reverse=True)
+    return out[:limit]
+
+
+@dataclass
+class Health:
+    score: int
+    grade: str  # A..F
+    color: str  # shields.io colour name
+    reasons: list[str]
+
+
+def health_grade(stats: dict[str, FileStat], summary, trend) -> Health:
+    """A single A–F health grade, from transparent penalties."""
+    score = 100
+    reasons: list[str] = []
+
+    active = summary.active_files or 1
+    bus = bus_factor_risks(stats, limit=10 ** 9)
+    pen_bus = min(30, round(len(bus) / active * 100))
+    if pen_bus:
+        score -= pen_bus
+        reasons.append(f"-{pen_bus} bus factor ({len(bus)} fichiers à auteur unique)")
+
+    if trend and trend.direction == "up":
+        score -= 15
+        reasons.append("-15 pression hotspots en hausse")
+    elif trend and trend.direction == "down":
+        score = min(100, score + 5)
+        reasons.append("+5 pression hotspots en baisse")
+
+    score = max(0, min(100, score))
+    grade = ("A" if score >= 85 else "B" if score >= 70 else "C" if score >= 55
+             else "D" if score >= 40 else "F")
+    color = {"A": "brightgreen", "B": "green", "C": "yellow", "D": "orange", "F": "red"}[grade]
+    return Health(score=score, grade=grade, color=color, reasons=reasons)
+
+
+def find_files(stats: dict[str, FileStat], query: str) -> list[str]:
+    """Resolve a user-typed path to tracked file paths (exact, then suffix/basename)."""
+    q = query.replace("\\", "/").lstrip("./").lower()
+    if query in stats:
+        return [query]
+    exact = [p for p in stats if p.lower() == q]
+    if exact:
+        return exact
+    return sorted(p for p in stats if p.lower().endswith("/" + q) or p.split("/")[-1].lower() == q)
 
 
 @dataclass

@@ -33,7 +33,7 @@ def measure(data: bytes) -> tuple[int, int]:
     if not data:
         return 0, 1
     lines = data.count(b"\n") + (0 if data.endswith(b"\n") else 1)
-    if b"\x00" in data[:4096]:  # looks binary
-        return lines, max(lines, 1)
+    if b"\x00" in data[:4096]:  # looks binary — has no meaningful complexity
+        return lines, 1
     text = data.decode("utf-8", "ignore")
     return lines, 1 + len(_DECISION.findall(text))

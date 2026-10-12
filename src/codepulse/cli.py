@@ -10,10 +10,12 @@ Two modes:
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
 import sys
 import webbrowser
+from urllib.parse import quote
 
 from . import analyzers
 from .git_data import get_changed_files, get_commits, is_git_repo
@@ -37,6 +39,10 @@ def build_parser() -> argparse.ArgumentParser:
                         help="exclude paths matching this glob (repeatable), e.g. '*.sql'")
     parser.add_argument("--no-default-ignore", action="store_true",
                         help="don't exclude the built-in generated/data file patterns")
+    parser.add_argument("--who", metavar="PATH",
+                        help="show who knows a file best (from git history) and exit")
+    parser.add_argument("--badge", action="store_true",
+                        help="print a shields.io health-badge snippet and exit")
 
     gate = parser.add_argument_group("risk gate (CI)")
     gate.add_argument("--changed", metavar="REF",
@@ -63,15 +69,17 @@ def _run_report(repo: str, args: argparse.Namespace) -> int:
     print(f"  {len(commits)} commits")
 
     stats = analyzers.build_file_stats(commits, repo)
+    summary = analyzers.summarize(commits, stats)
     hot = analyzers.hotspots(stats, limit=args.top)
     hotspot_paths = {h.path for h in analyzers.hotspots(stats, limit=15)}
     html = render(
         repo_name=os.path.basename(repo.rstrip("/\\")) or repo,
-        summary=analyzers.summarize(commits, stats),
+        summary=summary,
         hotspots=hot,
         bus_risks=analyzers.bus_factor_risks(stats, limit=args.top),
         coupling=analyzers.coupling(commits, stats, limit=args.top),
         trend=analyzers.monthly_trend(commits, hotspot_paths),
+        stale=analyzers.stale_risks(stats, summary.last_timestamp, limit=args.top),
     )
 
     out = os.path.abspath(args.output)
@@ -154,6 +162,63 @@ def _run_gate(repo: str, args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_stats(repo: str, args: argparse.Namespace):
+    commits = get_commits(repo, since=args.since, max_count=args.max_count)
+    if not commits:
+        return None, None
+    commits = analyzers.filter_commits(commits, _ignore_patterns(args))
+    return commits, analyzers.build_file_stats(commits, repo)
+
+
+def _run_who(repo: str, args: argparse.Namespace) -> int:
+    commits, stats = _load_stats(repo, args)
+    if not commits:
+        print("error: no commits found.", file=sys.stderr)
+        return 1
+    matches = analyzers.find_files(stats, args.who)
+    if not matches:
+        print(f"Aucun fichier suivi ne correspond à '{args.who}'.", file=sys.stderr)
+        return 1
+    if len(matches) > 1:
+        print(f"Plusieurs fichiers correspondent à '{args.who}' — précise le chemin :")
+        for m in matches[:20]:
+            print(f"  {m}")
+        return 1
+
+    s = stats[matches[0]]
+    total = sum(s.authors.values())
+    last = datetime.datetime.fromtimestamp(s.last_timestamp).strftime("%Y-%m-%d")
+    print(f"{s.path} — {s.commits} commits, {s.num_authors} auteur(s), dernier changement {last}")
+    for author, n in s.authors.most_common(8):
+        print(f"  {round(n / total * 100):>3}%  {n:>3} commits  {author}")
+    if s.num_authors == 1:
+        print("  ⚠️ Un seul auteur — risque de bus factor.")
+    return 0
+
+
+def _run_badge(repo: str, args: argparse.Namespace) -> int:
+    commits, stats = _load_stats(repo, args)
+    if not commits:
+        print("error: no commits found.", file=sys.stderr)
+        return 1
+    summary = analyzers.summarize(commits, stats)
+    hotspot_paths = {h.path for h in analyzers.hotspots(stats, limit=15)}
+    trend = analyzers.monthly_trend(commits, hotspot_paths)
+    health = analyzers.health_grade(stats, summary, trend)
+
+    message = f"{health.grade} ({health.score})"
+    static = f"https://img.shields.io/badge/{quote('code health')}-{quote(message)}-{health.color}"
+    print(f"Grade: {health.grade} ({health.score}/100)")
+    for r in health.reasons:
+        print(f"  {r}")
+    print("\nMarkdown (copie dans ton README) :")
+    print(f"![code health]({static})")
+    print("\nJSON (endpoint shields.io, si tu héberges ce fichier) :")
+    print(json.dumps({"schemaVersion": 1, "label": "code health", "message": message, "color": health.color},
+                     ensure_ascii=False))
+    return 0
+
+
 def _force_utf8() -> None:
     # Windows consoles default to cp1252 and choke on emoji/box-drawing output.
     for stream in (sys.stdout, sys.stderr):
@@ -172,7 +237,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: '{repo}' is not a git repository.", file=sys.stderr)
         return 2
 
-    return _run_gate(repo, args) if args.changed else _run_report(repo, args)
+    if args.who:
+        return _run_who(repo, args)
+    if args.badge:
+        return _run_badge(repo, args)
+    if args.changed:
+        return _run_gate(repo, args)
+    return _run_report(repo, args)
 
 
 if __name__ == "__main__":

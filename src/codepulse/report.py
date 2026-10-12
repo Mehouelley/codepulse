@@ -10,7 +10,7 @@ import datetime as _dt
 import html
 
 from . import charts
-from .analyzers import CouplingPair, FileStat, Summary, Trend
+from .analyzers import CouplingPair, FileStat, StaleFile, Summary, Trend
 
 
 def _esc(value: object) -> str:
@@ -57,6 +57,28 @@ def _trend_section(trend: Trend) -> str:
   </section>"""
 
 
+def _stale_section(stale: list[StaleFile]) -> str:
+    if not stale:
+        return ""
+    rows = "\n".join(
+        f"""<tr>
+          <td class="path">{_esc(s.path)}</td>
+          <td class="num">{s.complexity:,}</td>
+          <td class="num">{s.days_stale} j</td>
+          <td class="owner">{_esc(s.main_owner[0] or '—')}</td>
+        </tr>"""
+        for s in stale
+    )
+    return f"""<section>
+    <h2>🕸️ Code orphelin</h2>
+    <p class="hint">Fichiers complexes que plus personne n'a touchés depuis longtemps — de la logique qui vieillit et que plus grand monde ne comprend.</p>
+    <table>
+      <thead><tr><th>Fichier</th><th class="num">Complexité</th><th class="num">Sans changement</th><th>Dernier auteur</th></tr></thead>
+      <tbody>{rows}</tbody>
+    </table>
+  </section>"""
+
+
 def render(
     repo_name: str,
     summary: Summary,
@@ -64,6 +86,7 @@ def render(
     bus_risks: list[FileStat],
     coupling: list[CouplingPair],
     trend: Trend | None = None,
+    stale: list[StaleFile] | None = None,
 ) -> str:
     generated = _dt.datetime.now().strftime("%Y-%m-%d %H:%M")
     span = f"{_date(summary.first_timestamp)} → {_date(summary.last_timestamp)}"
@@ -114,6 +137,7 @@ def render(
         span=span,
         chart_css=charts.CHART_CSS,
         trend_section=_trend_section(trend),
+        stale_section=_stale_section(stale or []),
         total_commits=f"{summary.total_commits:,}",
         active_files=f"{summary.active_files:,}",
         tracked_files=f"{summary.tracked_files:,}",
@@ -236,6 +260,8 @@ footer a {{ color: var(--accent); text-decoration: none; }}
       <tbody>{coupling_rows}</tbody>
     </table>
   </section>
+
+  {stale_section}
 
   <section>
     <h2>🏆 Top contributeurs</h2>

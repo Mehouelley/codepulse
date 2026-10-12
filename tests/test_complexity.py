@@ -23,5 +23,5 @@ def test_last_line_without_newline_counts():
 
 
 def test_binary_is_neutral():
-    lines, cx = complexity.measure(b"\x00\x01if for while\x00")
-    assert cx == lines  # branches inside binary are ignored
+    _, cx = complexity.measure(b"\x00\x01if\nfor\nwhile\x00")
+    assert cx == 1  # binary files have no meaningful complexity

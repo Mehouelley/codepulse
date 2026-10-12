@@ -61,6 +61,9 @@ python -m codepulse . --since "6 months ago" --top 30 -o health.html
 | `--max-count N` | Limit to the N most recent commits |
 | `--top N` | Rows per table (default: 20) |
 | `--open` | Open the report in a browser when done |
+| `--who PATH` | Show who knows a file best (from history) and exit |
+| `--badge` | Print a shields.io health-badge snippet and exit |
+| `--ignore GLOB` | Exclude paths matching a glob (repeatable) |
 
 ---
 
@@ -137,6 +140,9 @@ simple enough to run in one command.
 - [x] Trend over time (adaptive day/week/month buckets + hotspot-pressure verdict)
 - [x] Complexity-based hotspots (decision-point estimate instead of line count)
 - [x] Suggested PR reviewers from code ownership (in gate text/json/comment)
+- [x] `--who <file>` — who knows this code best
+- [x] `--badge` — shareable A–F health badge for your README
+- [x] Orphaned-code section — complex files nobody touches anymore
 
 ## Development
 
