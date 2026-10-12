@@ -10,7 +10,7 @@ import datetime as _dt
 import html
 
 from . import charts
-from .analyzers import CouplingPair, FileStat, StaleFile, Summary, Trend
+from .analyzers import CouplingPair, FileStat, Recommendation, StaleFile, Summary, Trend
 
 
 def _esc(value: object) -> str:
@@ -79,6 +79,32 @@ def _stale_section(stale: list[StaleFile]) -> str:
   </section>"""
 
 
+def _code_spans(text: str) -> str:
+    """Escape, then turn `backtick` spans into <code>."""
+    out, code = [], False
+    for part in _esc(text).split("`"):
+        out.append(f"<code>{part}</code>" if code else part)
+        code = not code
+    return "".join(out)
+
+
+def _rec_section(recs: list[Recommendation]) -> str:
+    if not recs:
+        return ""
+    items = "\n".join(
+        f"""<li class="rec p{min(r.priority, 3)}">
+          <div class="rec-head">{r.icon} <strong>{_esc(r.title)}</strong></div>
+          <div class="rec-action">{_code_spans(r.action)}</div>
+        </li>"""
+        for r in recs
+    )
+    return f"""<section class="recs-section">
+    <h2>🎯 Recommandations</h2>
+    <p class="hint">Les actions concrètes à prendre, de la plus urgente à la moins urgente.</p>
+    <ol class="recs">{items}</ol>
+  </section>"""
+
+
 def render(
     repo_name: str,
     summary: Summary,
@@ -87,6 +113,7 @@ def render(
     coupling: list[CouplingPair],
     trend: Trend | None = None,
     stale: list[StaleFile] | None = None,
+    recommendations: list[Recommendation] | None = None,
 ) -> str:
     generated = _dt.datetime.now().strftime("%Y-%m-%d %H:%M")
     span = f"{_date(summary.first_timestamp)} → {_date(summary.last_timestamp)}"
@@ -136,6 +163,7 @@ def render(
         generated=generated,
         span=span,
         chart_css=charts.CHART_CSS,
+        rec_section=_rec_section(recommendations or []),
         trend_section=_trend_section(trend),
         stale_section=_stale_section(stale or []),
         total_commits=f"{summary.total_commits:,}",
@@ -207,6 +235,23 @@ tr:last-child td {{ border-bottom: none; }}
 .badge.mid {{ background: var(--mid); }}
 .badge.low {{ background: var(--low); }}
 .empty {{ color: var(--muted); text-align: center; padding: 20px; }}
+.recs-section {{ border-color: var(--accent); }}
+ol.recs {{ list-style: none; counter-reset: rec; margin: 0; padding: 0; }}
+ol.recs .rec {{ counter-increment: rec; position: relative; padding: 12px 12px 12px 44px; margin-bottom: 10px;
+  border: 1px solid var(--line); border-left: 4px solid var(--muted); border-radius: 10px; background: var(--bg); }}
+ol.recs .rec::before {{ content: counter(rec); position: absolute; left: 12px; top: 12px; width: 22px; height: 22px;
+  border-radius: 50%; background: var(--muted); color: #fff; font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; }}
+ol.recs .rec.p1 {{ border-left-color: var(--hot); }}
+ol.recs .rec.p1::before {{ background: var(--hot); }}
+ol.recs .rec.p2 {{ border-left-color: var(--mid); }}
+ol.recs .rec.p2::before {{ background: var(--mid); }}
+ol.recs .rec.p3 {{ border-left-color: var(--low); }}
+ol.recs .rec.p3::before {{ background: var(--low); }}
+.rec-head {{ font-size: 15px; margin-bottom: 3px; }}
+.rec-action {{ color: var(--muted); font-size: 14px; }}
+.rec-action code {{ font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--ink);
+  background: var(--panel); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); }}
 ul.contrib {{ list-style: none; margin: 0; padding: 0; }}
 ul.contrib li {{ display: grid; grid-template-columns: 180px 1fr 40px; gap: 10px; align-items: center; padding: 5px 0; }}
 ul.contrib .c-name {{ font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
@@ -231,6 +276,8 @@ footer a {{ color: var(--accent); text-decoration: none; }}
     <div class="card"><div class="k">Fichiers suivis</div><div class="v">{tracked_files}</div></div>
     <div class="card"><div class="k">Contributeurs</div><div class="v">{contributors}</div></div>
   </div>
+
+  {rec_section}
 
   {trend_section}
 

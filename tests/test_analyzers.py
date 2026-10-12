@@ -90,6 +90,21 @@ def test_release_risk_high_for_hotspot_single_owner():
     assert any("auteur unique" in r for r in risk.files[0].reasons)
 
 
+def test_recommendations_prioritize_and_detect_duplicate_authors():
+    commits = [
+        Commit(str(i), i * DAY, "Alice" if i % 2 else "alice",
+               files=[FileChange("hot.py", 1, 0)])
+        for i in range(6)
+    ]
+    hot = [stat("hot.py", commits=6, authors={"Alice": 3, "alice": 3}, complexity=40)]
+    bus = [stat("solo.py", commits=4, authors={"Alice": 4})]
+    recs = analyzers.recommendations(commits, hot, bus, [], None, [])
+    titles = " ".join(r.title for r in recs)
+    assert "hot.py" in titles  # top hotspot recommended
+    assert any("identit" in r.title.lower() for r in recs)  # duplicate Alice/alice detected
+    assert recs == sorted(recs, key=lambda r: r.priority)  # sorted by urgency
+
+
 def test_suggested_reviewers_ranks_by_coverage_then_depth():
     stats = {
         "a.py": stat("a.py", 5, {"Alice": 4, "Bob": 1}),

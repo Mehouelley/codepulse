@@ -315,6 +315,86 @@ def stale_risks(stats: dict[str, FileStat], now_ts: int, limit: int = 15) -> lis
 
 
 @dataclass
+class Recommendation:
+    priority: int  # 1 = most urgent
+    icon: str
+    title: str
+    action: str
+
+
+def _duplicate_authors(commits: list[Commit]) -> list[tuple[str, ...]]:
+    """Author names that differ only by case/spacing — likely one person."""
+    groups: dict[str, set] = defaultdict(set)
+    for c in commits:
+        groups[c.author.strip().lower()].add(c.author.strip())
+    return [tuple(sorted(v)) for v in groups.values() if len(v) > 1]
+
+
+def recommendations(
+    commits: list[Commit],
+    hotspots: list[FileStat],
+    bus_risks: list[FileStat],
+    coupling: list[CouplingPair],
+    trend,
+    stale: list[StaleFile],
+    limit: int = 8,
+) -> list[Recommendation]:
+    """Turn the findings into concrete, prioritized actions to take."""
+    recs: list[Recommendation] = []
+
+    for h in hotspots[:2]:
+        recs.append(Recommendation(
+            1, "🔥", f"Refactorer `{h.path}`",
+            f"{h.commits} commits et une complexité de {h.complexity} : c'est un point chaud majeur, "
+            f"là où les bugs naissent. Découpez-le en unités plus petites et couvrez-le de tests avant d'y retoucher.",
+        ))
+
+    if trend and trend.direction == "up":
+        recs.append(Recommendation(
+            1, "📈", "Freiner la dette technique",
+            "La part des commits touchant les hotspots augmente. Gelez les nouvelles fonctionnalités sur ces "
+            "fichiers et refactorez-les d'abord, sinon les bugs vont s'accumuler.",
+        ))
+
+    if bus_risks:
+        top = bus_risks[0]
+        owner = top.main_owner[0] or "une seule personne"
+        recs.append(Recommendation(
+            2, "👥", "Partager la connaissance",
+            f"{len(bus_risks)} fichiers n'ont qu'un seul auteur (ex. `{top.path}`, par {owner}). "
+            "Documentez-les ou passez-les en revue à deux : si cette personne part, ce savoir disparaît.",
+        ))
+
+    dupes = _duplicate_authors(commits)
+    if dupes:
+        a, b = dupes[0][0], dupes[0][1]
+        recs.append(Recommendation(
+            2, "🪪", "Unifier les identités git",
+            f"« {a} » et « {b} » semblent être la même personne (casse différente). Ajoutez un fichier "
+            "`.mailmap` pour fusionner les statistiques et compter les contributeurs correctement.",
+        ))
+
+    if coupling:
+        p = coupling[0]
+        recs.append(Recommendation(
+            3, "🔗", "Clarifier un couplage caché",
+            f"`{p.a}` et `{p.b}` changent presque toujours ensemble ({p.shared}×). Vérifiez cette dépendance : "
+            "à expliciter, documenter, ou factoriser si elle est accidentelle.",
+        ))
+
+    if stale:
+        s = stale[0]
+        recs.append(Recommendation(
+            3, "🕸️", "Revoir du code qui vieillit",
+            f"`{s.path}` est complexe (complexité {s.complexity}) mais intact depuis {s.days_stale} jours. "
+            "Vérifiez qu'il est encore utile, à jour et documenté avant que personne ne s'en souvienne.",
+        ))
+
+    recs.sort(key=lambda r: r.priority)
+    return recs[:limit]
+
+
+@dataclass
 class Health:
     score: int
     grade: str  # A..F

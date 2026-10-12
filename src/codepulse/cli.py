@@ -71,21 +71,33 @@ def _run_report(repo: str, args: argparse.Namespace) -> int:
     stats = analyzers.build_file_stats(commits, repo)
     summary = analyzers.summarize(commits, stats)
     hot = analyzers.hotspots(stats, limit=args.top)
+    bus = analyzers.bus_factor_risks(stats, limit=args.top)
     hotspot_paths = {h.path for h in analyzers.hotspots(stats, limit=15)}
+    trend = analyzers.monthly_trend(commits, hotspot_paths)
+    coupled = analyzers.coupling(commits, stats, limit=args.top)
+    stale = analyzers.stale_risks(stats, summary.last_timestamp, limit=args.top)
+    recs = analyzers.recommendations(commits, hot, bus, coupled, trend, stale)
+
     html = render(
         repo_name=os.path.basename(repo.rstrip("/\\")) or repo,
         summary=summary,
         hotspots=hot,
-        bus_risks=analyzers.bus_factor_risks(stats, limit=args.top),
-        coupling=analyzers.coupling(commits, stats, limit=args.top),
-        trend=analyzers.monthly_trend(commits, hotspot_paths),
-        stale=analyzers.stale_risks(stats, summary.last_timestamp, limit=args.top),
+        bus_risks=bus,
+        coupling=coupled,
+        trend=trend,
+        stale=stale,
+        recommendations=recs,
     )
 
     out = os.path.abspath(args.output)
     with open(out, "w", encoding="utf-8") as fh:
         fh.write(html)
     print(f"\nReport written to {out}")
+    if recs:
+        print("\nRecommandations :")
+        for i, r in enumerate(recs, 1):
+            print(f"  {i}. {r.icon} {r.title.replace('`', '')}")
+            print(f"     {r.action.replace('`', '')}")
     if args.open:
         webbrowser.open(f"file://{out}")
     return 0

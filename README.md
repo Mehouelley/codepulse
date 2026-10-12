@@ -182,6 +182,7 @@ simple enough to run in one command.
 - [x] `--who <file>` — who knows this code best
 - [x] `--badge` — shareable A–F health badge for your README
 - [x] Orphaned-code section — complex files nobody touches anymore
+- [x] **Recommendations** — prioritized, concrete actions, not just findings
 
 ## Development
 
