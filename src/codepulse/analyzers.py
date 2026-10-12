@@ -14,6 +14,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 
+from . import complexity as _complexity
 from .git_data import Commit
 
 # Files that are generated, vendored, or pure data — real churn, but not code
@@ -62,6 +63,7 @@ class FileStat:
     deleted: int = 0
     last_timestamp: int = 0
     loc: int = 0  # current line count in the working tree
+    complexity: int = 0  # estimated decision points (see complexity.py)
     exists: bool = True  # still present on disk?
 
     @property
@@ -79,16 +81,16 @@ class FileStat:
 
     @property
     def hotspot_score(self) -> int:
-        """Change frequency x size. High = complex AND churned."""
-        return self.commits * self.loc
+        """Change frequency x complexity. High = complex AND churned."""
+        return self.commits * self.complexity
 
 
-def _count_lines(path: str) -> int:
+def _measure_file(path: str) -> tuple[int, int]:
     try:
         with open(path, "rb") as fh:
-            return sum(1 for _ in fh)
+            return _complexity.measure(fh.read())
     except Exception:
-        return 0
+        return 0, 0
 
 
 def build_file_stats(commits: list[Commit], repo: str) -> dict[str, FileStat]:
@@ -108,7 +110,7 @@ def build_file_stats(commits: list[Commit], repo: str) -> dict[str, FileStat]:
     for stat in stats.values():
         full = os.path.join(repo, stat.path.replace("/", os.sep))
         if os.path.isfile(full):
-            stat.loc = _count_lines(full)
+            stat.loc, stat.complexity = _measure_file(full)
             stat.exists = True
         else:
             stat.exists = False

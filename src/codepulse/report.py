@@ -74,7 +74,7 @@ def render(
           <td class="rank">{i}</td>
           <td class="path">{_esc(h.path)}</td>
           <td class="num">{h.commits}</td>
-          <td class="num">{h.loc:,}</td>
+          <td class="num">{h.complexity:,}</td>
           <td class="score">{_bar(h.hotspot_score, max_hot)}<span class="score-val">{h.hotspot_score:,}</span></td>
         </tr>"""
         for i, h in enumerate(hotspots, 1)
@@ -212,9 +212,9 @@ footer a {{ color: var(--accent); text-decoration: none; }}
 
   <section>
     <h2>🔥 Hotspots</h2>
-    <p class="hint">Fichiers à la fois volumineux et souvent modifiés — là où les bugs naissent et où refactorer rapporte le plus.</p>
+    <p class="hint">Fichiers à la fois complexes (beaucoup de chemins de décision) et souvent modifiés — là où les bugs naissent et où refactorer rapporte le plus.</p>
     <table>
-      <thead><tr><th></th><th>Fichier</th><th class="num">Commits</th><th class="num">Lignes</th><th>Score (commits × lignes)</th></tr></thead>
+      <thead><tr><th></th><th>Fichier</th><th class="num">Commits</th><th class="num">Complexité</th><th>Score (commits × complexité)</th></tr></thead>
       <tbody>{hot_rows}</tbody>
     </table>
   </section>

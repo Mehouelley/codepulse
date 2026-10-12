@@ -104,7 +104,9 @@ that risk visible *before* merge, not after an incident.
 1. Parses `git log --numstat` into commits and file changes (no merges).
 2. Accumulates per-file history: commit count, authors, size on disk.
 3. Derives the signals:
-   - **Hotspot score** = `commits × current lines of code`.
+   - **Hotspot score** = `commits × complexity`, where complexity estimates
+     decision points (branch keywords + boolean operators) — far better than
+     raw line count at telling "big but simple" from "dense and risky".
    - **Bus factor risk** = files with ≥3 commits but exactly one author.
    - **Coupling degree** = `commits-together / min(individual commits)`,
      ignoring bulk commits that touch many files at once.
@@ -120,7 +122,7 @@ simple enough to run in one command.
 - [x] Ignore globs / path filters for generated & data files
 - [x] Post the gate result as a sticky PR comment (GitHub Action)
 - [x] Trend over time (adaptive day/week/month buckets + hotspot-pressure verdict)
-- [ ] Real complexity metrics per language (beyond line count)
+- [x] Complexity-based hotspots (decision-point estimate instead of line count)
 
 ## License
 
