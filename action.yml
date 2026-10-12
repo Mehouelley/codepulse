@@ -1,0 +1,69 @@
+name: 'CodePulse Risk Gate'
+description: 'Score pull-request changes against your git history, comment the risk, and gate on it.'
+author: 'Mehouelley'
+
+branding:
+  icon: 'activity'
+  color: 'red'
+
+inputs:
+  path:
+    description: 'Path to the repository to analyze'
+    required: false
+    default: '.'
+  fail-on:
+    description: 'Fail the job when risk reaches this level (LOW|MEDIUM|HIGH). Leave empty to never fail.'
+    required: false
+    default: 'HIGH'
+  base-ref:
+    description: 'Base ref to diff against. Defaults to the PR base branch.'
+    required: false
+    default: ''
+  comment:
+    description: 'Post/update a sticky risk comment on the PR (true|false).'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install CodePulse
+      shell: bash
+      run: pip install "${{ github.action_path }}"
+
+    - name: Resolve base ref
+      id: base
+      shell: bash
+      run: |
+        base="${{ inputs.base-ref }}"
+        if [ -z "$base" ]; then base="origin/${{ github.base_ref }}"; fi
+        echo "ref=$base" >> "$GITHUB_OUTPUT"
+
+    - name: Comment risk on PR
+      if: ${{ inputs.comment == 'true' && github.event.pull_request.number }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+      run: |
+        codepulse "${{ inputs.path }}" --changed "${{ steps.base.outputs.ref }}" \
+          --format markdown > "$RUNNER_TEMP/codepulse.md"
+        cat "$RUNNER_TEMP/codepulse.md"
+        id=$(gh api "repos/$REPO/issues/$PR/comments" \
+               --jq '.[] | select(.body | startswith("<!-- codepulse -->")) | .id' | head -1)
+        if [ -n "$id" ]; then
+          gh api --method PATCH "repos/$REPO/issues/comments/$id" \
+            -f body="$(cat "$RUNNER_TEMP/codepulse.md")" >/dev/null
+        else
+          gh pr comment "$PR" --body-file "$RUNNER_TEMP/codepulse.md"
+        fi
+
+    - name: Enforce risk gate
+      if: ${{ inputs.fail-on != '' }}
+      shell: bash
+      run: codepulse "${{ inputs.path }}" --changed "${{ steps.base.outputs.ref }}" --fail-on "${{ inputs.fail-on }}"

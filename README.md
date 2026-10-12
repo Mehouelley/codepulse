@@ -14,13 +14,35 @@ person's head, and which files are secretly glued together.
 Because it works purely from git history, **CodePulse works on any language**,
 with **zero dependencies** beyond git and Python.
 
+---
+
+## Demo
+
+<!-- Render docs/demo.gif from demo.tape with `vhs demo.tape`, then:
+     ![demo](docs/demo.gif) -->
+
 ```console
+$ codepulse . --badge
+Grade: B (83/100)
+  -2 bus factor (9 fichiers à auteur unique)
+  -15 pression hotspots en hausse
+![code health](https://img.shields.io/badge/code%20health-B%20(83)-green)
+
 $ codepulse . --changed origin/main
 🔴 Release risk: HIGH (100/100)
    56 changed files · 2 high-risk
    [100] crates/ui-egui/src/lib.rs  (hotspot majeur)
    [ 70] crates/layout/src/para.rs  (zone active, auteur unique)
+   👥 Relecteurs suggérés: Valentin Klein (29/37 fichiers), Dmitrii Khlapov (22/37)
+
+$ codepulse . --who crates/ui-egui/src/canvas.rs
+crates/ui-egui/src/canvas.rs — 64 commits, 22 auteur(s), dernier changement 2026-10-12
+   45%   29 commits  Valentin Klein
+   11%    7 commits  Dmitrii Khlapov
 ```
+
+> A recordable [`demo.tape`](demo.tape) (for [VHS](https://github.com/charmbracelet/vhs))
+> generates an animated `docs/demo.gif` of the above.
 
 ---
 
@@ -94,19 +116,38 @@ Output (JSON):
 }
 ```
 
-### GitHub Actions
+### GitHub Action (two lines)
 
-A ready-to-use workflow ships in [`.github/workflows/codepulse.yml`](.github/workflows/codepulse.yml).
-On every pull request it scores the change, posts a **sticky comment** (updated
-in place, never spammed), and fails the check on `HIGH` risk:
+Add CodePulse to any repository as a reusable Action — it scores each PR, posts
+a **sticky comment** (updated in place, never spammed), and fails the check on
+`HIGH` risk:
+
+```yaml
+name: CodePulse
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  risk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # full history is required
+      - uses: Mehouelley/codepulse@v0.1.0
+        with:
+          fail-on: HIGH # or MEDIUM / LOW / '' to never fail
+```
+
+The PR comment looks like:
 
 > 🩺 **CodePulse — Risque : 🔴 HIGH (100/100)**
 > 38 fichiers modifiés · 1 à risque élevé
-> | Risque | Fichier | Pourquoi |
-> |---:|---|---|
-> | 100 | `crates/ui-egui/src/lib.rs` | hotspot majeur |
+>
+> 👥 **Relecteurs suggérés** : Valentin Klein (29/37 fichiers), Dmitrii Khlapov (22/37)
 
-Drop the file into any repository to enable it — no extra configuration.
+Prefer a plain workflow with no external action? One ships in
+[`.github/workflows/codepulse.yml`](.github/workflows/codepulse.yml) — copy it in as-is.
 
 **Why DevOps cares:** a release is roughly as risky as its riskiest file.
 Touching a well-known hotspot — or a file only one person understands — is
