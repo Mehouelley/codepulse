@@ -136,6 +136,7 @@ simple enough to run in one command.
 - [x] Post the gate result as a sticky PR comment (GitHub Action)
 - [x] Trend over time (adaptive day/week/month buckets + hotspot-pressure verdict)
 - [x] Complexity-based hotspots (decision-point estimate instead of line count)
+- [x] Suggested PR reviewers from code ownership (in gate text/json/comment)
 
 ## Development
 

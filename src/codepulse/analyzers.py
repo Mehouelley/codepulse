@@ -250,6 +250,36 @@ def release_risk(changed: list[str], stats: dict[str, FileStat]) -> ReleaseRisk:
 
 
 @dataclass
+class Reviewer:
+    name: str
+    files_known: int  # how many of the changed files this person has touched
+    commits: int  # their total commits across those files
+
+
+def suggested_reviewers(changed: list[str], stats: dict[str, FileStat], limit: int = 3):
+    """Who knows the changed code best, from git history.
+
+    Returns (known_file_count, reviewers). Ranks by how many of the changed
+    files a person has touched, then by their commit depth on them — exactly
+    what you want when picking a reviewer for a PR.
+    """
+    known = [p for p in changed if p in stats and stats[p].exists and stats[p].authors]
+    commits_by_author: Counter = Counter()
+    files_by_author: dict[str, set] = defaultdict(set)
+    for path in known:
+        for author, n in stats[path].authors.items():
+            commits_by_author[author] += n
+            files_by_author[author].add(path)
+
+    reviewers = [
+        Reviewer(name=a, files_known=len(files_by_author[a]), commits=commits_by_author[a])
+        for a in commits_by_author
+    ]
+    reviewers.sort(key=lambda r: (r.files_known, r.commits), reverse=True)
+    return len(known), reviewers[:limit]
+
+
+@dataclass
 class Summary:
     total_commits: int
     tracked_files: int

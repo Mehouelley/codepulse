@@ -90,6 +90,26 @@ def test_release_risk_high_for_hotspot_single_owner():
     assert any("auteur unique" in r for r in risk.files[0].reasons)
 
 
+def test_suggested_reviewers_ranks_by_coverage_then_depth():
+    stats = {
+        "a.py": stat("a.py", 5, {"Alice": 4, "Bob": 1}),
+        "b.py": stat("b.py", 3, {"Alice": 3}),
+        "c.py": stat("c.py", 2, {"Bob": 2}),
+    }
+    known, reviewers = analyzers.suggested_reviewers(["a.py", "b.py", "c.py"], stats)
+    assert known == 3
+    # Alice knows 2 of 3 files -> ranks first; Bob knows 2 as well but fewer... check
+    assert reviewers[0].name == "Alice"
+    assert reviewers[0].files_known == 2
+
+
+def test_suggested_reviewers_ignores_unknown_files():
+    stats = {"a.py": stat("a.py", 5, {"Alice": 5})}
+    known, reviewers = analyzers.suggested_reviewers(["a.py", "new.py"], stats)
+    assert known == 1
+    assert reviewers[0].name == "Alice"
+
+
 def test_release_risk_low_for_new_file():
     stats = {"hot.py": stat("hot.py", 10, {"A": 10}, complexity=100)}
     risk = analyzers.release_risk(["brand_new.py"], stats)

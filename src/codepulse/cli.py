@@ -93,6 +93,10 @@ def _run_gate(repo: str, args: argparse.Namespace) -> int:
     stats = analyzers.build_file_stats(commits, repo)
     changed = [p for p in get_changed_files(repo, args.changed) if not analyzers.is_ignored(p, patterns)]
     risk = analyzers.release_risk(changed, stats)
+    known_count, reviewers = analyzers.suggested_reviewers(changed, stats)
+
+    def _reviewer_label(r):
+        return f"{r.name} ({r.files_known}/{known_count} fichiers)"
 
     icons = {"HIGH": "🔴", "MEDIUM": "🟠", "LOW": "🟢"}
 
@@ -105,6 +109,9 @@ def _run_gate(repo: str, args: argparse.Namespace) -> int:
             "files": [
                 {"path": f.path, "risk": f.risk, "commits": f.commits, "loc": f.loc, "reasons": f.reasons}
                 for f in risk.files
+            ],
+            "suggested_reviewers": [
+                {"name": r.name, "files_known": r.files_known, "commits": r.commits} for r in reviewers
             ],
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -124,6 +131,9 @@ def _run_gate(repo: str, args: argparse.Namespace) -> int:
                 lines.append(f"| {f.risk} | `{f.path}` | {', '.join(f.reasons)} |")
         else:
             lines.append("_Aucun fichier à risque touché._ ✅")
+        if reviewers:
+            lines += ["", "**👥 Relecteurs suggérés** (d'après l'historique) : "
+                      + ", ".join(_reviewer_label(r) for r in reviewers)]
         lines += [
             "",
             "<sub>Score basé sur l'historique du dépôt. Risque élevé = touche un hotspot connu ou un fichier à auteur unique.</sub>",
@@ -135,6 +145,8 @@ def _run_gate(repo: str, args: argparse.Namespace) -> int:
         for f in risk.files:
             if f.risk > 0:
                 print(f"   [{f.risk:3}] {f.path}  ({', '.join(f.reasons)})")
+        if reviewers:
+            print("   👥 Relecteurs suggérés: " + ", ".join(_reviewer_label(r) for r in reviewers))
 
     if args.fail_on and _LEVELS[risk.level] >= _LEVELS[args.fail_on]:
         print(f"\nRisk level {risk.level} >= threshold {args.fail_on} — failing.", file=sys.stderr)
