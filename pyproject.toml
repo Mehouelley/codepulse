@@ -11,8 +11,15 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 keywords = ["git", "code-health", "hotspots", "technical-debt", "static-analysis"]
 
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
 [project.scripts]
 codepulse = "codepulse.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/codepulse"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

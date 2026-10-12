@@ -124,6 +124,17 @@ simple enough to run in one command.
 - [x] Trend over time (adaptive day/week/month buckets + hotspot-pressure verdict)
 - [x] Complexity-based hotspots (decision-point estimate instead of line count)
 
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+The suite covers the complexity estimator, git parsing, every analyzer, and an
+end-to-end run against a throwaway git repo. CI runs it on Python 3.10 and 3.12.
+
 ## License
 
 MIT
+
