@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codepulse"
+version = "0.1.0"
+description = "Reveal a codebase's health from its git history — hotspots, bus factor, hidden coupling."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["git", "code-health", "hotspots", "technical-debt", "static-analysis"]
+
+[project.scripts]
+codepulse = "codepulse.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codepulse"]
