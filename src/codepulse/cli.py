@@ -33,6 +33,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-count", type=int, help="limit to the N most recent commits")
     parser.add_argument("--top", type=int, default=20, help="rows per table (default: 20)")
     parser.add_argument("--open", action="store_true", help="open the HTML report in a browser when done")
+    parser.add_argument("--ignore", action="append", metavar="GLOB", default=[],
+                        help="exclude paths matching this glob (repeatable), e.g. '*.sql'")
+    parser.add_argument("--no-default-ignore", action="store_true",
+                        help="don't exclude the built-in generated/data file patterns")
 
     gate = parser.add_argument_group("risk gate (CI)")
     gate.add_argument("--changed", metavar="REF",
@@ -44,12 +48,18 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _ignore_patterns(args: argparse.Namespace) -> list[str]:
+    base = [] if args.no_default_ignore else list(analyzers.DEFAULT_IGNORE)
+    return base + list(args.ignore)
+
+
 def _run_report(repo: str, args: argparse.Namespace) -> int:
     print(f"Reading git history from {repo} ...")
     commits = get_commits(repo, since=args.since, max_count=args.max_count)
     if not commits:
         print("error: no commits found for the given filters.", file=sys.stderr)
         return 1
+    commits = analyzers.filter_commits(commits, _ignore_patterns(args))
     print(f"  {len(commits)} commits")
 
     stats = analyzers.build_file_stats(commits, repo)
@@ -75,8 +85,10 @@ def _run_gate(repo: str, args: argparse.Namespace) -> int:
     if not commits:
         print("error: no commits found to build a risk map.", file=sys.stderr)
         return 1
+    patterns = _ignore_patterns(args)
+    commits = analyzers.filter_commits(commits, patterns)
     stats = analyzers.build_file_stats(commits, repo)
-    changed = get_changed_files(repo, args.changed)
+    changed = [p for p in get_changed_files(repo, args.changed) if not analyzers.is_ignored(p, patterns)]
     risk = analyzers.release_risk(changed, stats)
 
     if args.format == "json":

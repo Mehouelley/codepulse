@@ -11,8 +11,43 @@ from __future__ import annotations
 import os
 from collections import Counter
 from dataclasses import dataclass, field
+from fnmatch import fnmatch
 
 from .git_data import Commit
+
+# Files that are generated, vendored, or pure data — real churn, but not code
+# whose health tells you anything. Excluded by default so they don't crowd out
+# the files that actually matter.
+DEFAULT_IGNORE: tuple[str, ...] = (
+    "*.lock", "Cargo.lock", "package-lock.json", "yarn.lock",
+    "pnpm-lock.yaml", "poetry.lock", "composer.lock", "Gemfile.lock",
+    "*.tsv", "*.csv",
+    "*.min.js", "*.min.css", "*.map", "*.snap",
+    "node_modules/*", "*/node_modules/*",
+    "dist/*", "*/dist/*", "build/*", "*/build/*",
+    "vendor/*", "*/vendor/*", "*/.next/*",
+)
+
+
+def is_ignored(path: str, patterns) -> bool:
+    """True if the path matches any glob pattern (whole path or basename)."""
+    base = path.rsplit("/", 1)[-1]
+    return any(fnmatch(path, p) or fnmatch(base, p) for p in patterns)
+
+
+def filter_commits(commits: list[Commit], patterns) -> list[Commit]:
+    """Drop ignored files from each commit, keeping the commit itself.
+
+    The commit still counts toward totals and author activity; only its ignored
+    file changes are removed, so hotspots/coupling/bus-factor ignore them too.
+    """
+    if not patterns:
+        return commits
+    out: list[Commit] = []
+    for c in commits:
+        kept = [fc for fc in c.files if not is_ignored(fc.path, patterns)]
+        out.append(Commit(hash=c.hash, timestamp=c.timestamp, author=c.author, files=kept))
+    return out
 
 
 @dataclass
