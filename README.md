@@ -61,46 +61,80 @@ pip install codepulse-cli    # installs the `codepulse` command
 ## Quick start
 
 ```bash
-# From a git repository:
-codepulse /path/to/repo --open
-
-# Common options:
-codepulse . --since "6 months ago" --top 30 -o health.html
+pip install codepulse-cli
+codepulse /path/to/repo --open      # full HTML health dashboard
 ```
 
-> Running from a source checkout instead? Use `python -m codepulse` with
-> `PYTHONPATH=src`, or `pip install -e .`.
+> No `codepulse` command found? Use `python -m codepulse ...` with the same
+> arguments, or add Python's user `Scripts` directory to your `PATH`.
 
-### Options
+## Commands
+
+CodePulse has **four modes**. The first argument is always the repo path
+(default: `.`).
+
+### 1. Report — the full dashboard (default)
+
+Recommendations, hotspots, bus factor, coupling, trend, orphaned code — as a
+self-contained HTML page.
+
+```bash
+codepulse .                        # writes codepulse-report.html
+codepulse C:\path\to\project --open
+```
+
+### 2. Risk gate — score a change (`--changed`)
+
+Scores only the files a change touches, for CI. Sets an exit code so a pipeline
+can warn or block.
+
+```bash
+codepulse . --changed origin/main --fail-on HIGH
+codepulse . --changed HEAD~5 --format markdown   # ready-to-post PR comment
+```
+
+### 3. Who knows this file? (`--who`)
+
+Ranks who understands a file best, from git history (accepts a partial path).
+
+```bash
+codepulse . --who src/App.tsx
+```
+
+### 4. Health badge (`--badge`)
+
+An A–F health grade plus a shields.io snippet for your README.
+
+```bash
+codepulse . --badge
+```
+
+## Options
 
 | Flag | Meaning |
 |---|---|
 | `repo` | Path to a git repository (default: current directory) |
-| `-o, --output` | Output HTML path (default: `codepulse-report.html`) |
-| `--since` | Only commits after a date, e.g. `"6 months ago"` |
-| `--max-count N` | Limit to the N most recent commits |
+| `-o, --output FILE` | Report output path (default: `codepulse-report.html`) |
+| `--open` | Open the HTML report in a browser when done |
 | `--top N` | Rows per table (default: 20) |
-| `--open` | Open the report in a browser when done |
-| `--who PATH` | Show who knows a file best (from history) and exit |
-| `--badge` | Print a shields.io health-badge snippet and exit |
+| `--since "6 months ago"` | Only commits after this date |
+| `--max-count N` | Limit to the N most recent commits |
 | `--ignore GLOB` | Exclude paths matching a glob (repeatable) |
+| `--no-default-ignore` | Keep generated/data files (locks, images, fonts, `node_modules`, …) |
+| `--who PATH` | Who knows a file best, then exit |
+| `--badge` | Print a health-badge snippet, then exit |
+| `--changed REF` | Risk-gate mode: score files changed since REF |
+| `--format text\|json\|markdown` | Risk-gate output format (default: `text`) |
+| `--fail-on LOW\|MEDIUM\|HIGH` | Exit non-zero when risk reaches this level |
 
 ---
 
-## Use in CI (the risk gate)
+## CI integration
 
-CodePulse can score *only the files a change touches* against the repo's risk
-map, then set an exit code so your pipeline can warn or block.
+The **risk gate** (mode 2 above) is built for CI: `--fail-on` sets the exit
+code, and `--format json` feeds dashboards and PR comments.
 
-```bash
-# Score what this branch changed vs main; fail the job on HIGH risk.
-python -m codepulse . --changed origin/main --fail-on HIGH
-
-# Machine-readable output for dashboards / PR comments:
-python -m codepulse . --changed origin/main --format json
-```
-
-Output (JSON):
+JSON output:
 
 ```json
 {
