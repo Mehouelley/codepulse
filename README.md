@@ -1,5 +1,10 @@
 # 🩺 CodePulse
 
+[![tests](https://github.com/Mehouelley/codepulse/actions/workflows/tests.yml/badge.svg)](https://github.com/Mehouelley/codepulse/actions/workflows/tests.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Zero dependencies](https://img.shields.io/badge/dependencies-none-brightgreen.svg)](pyproject.toml)
+
 **Reveal a codebase's health from its git history.**
 
 Linters read your code. CodePulse reads your code's *history* — and that reveals
@@ -9,13 +14,21 @@ person's head, and which files are secretly glued together.
 Because it works purely from git history, **CodePulse works on any language**,
 with **zero dependencies** beyond git and Python.
 
+```console
+$ codepulse . --changed origin/main
+🔴 Release risk: HIGH (100/100)
+   56 changed files · 2 high-risk
+   [100] crates/ui-egui/src/lib.rs  (hotspot majeur)
+   [ 70] crates/layout/src/para.rs  (zone active, auteur unique)
+```
+
 ---
 
 ## What it shows
 
 | Signal | Question it answers |
 |---|---|
-| 🔥 **Hotspots** | *Where do I refactor first?* Files that are both large and changed constantly — the birthplace of most bugs. |
+| 🔥 **Hotspots** | *Where do I refactor first?* Files that are both complex and changed constantly — the birthplace of most bugs. |
 | 👥 **Bus factor** | *What breaks if someone leaves?* Files actively maintained by a single person. |
 | 🔗 **Hidden coupling** | *What really depends on what?* Files that almost always change together, even when the code doesn't show a link. |
 | 🏆 **Contributors** | Who is active across the analyzed window. |
@@ -137,4 +150,3 @@ end-to-end run against a throwaway git repo. CI runs it on Python 3.10 and 3.12.
 ## License
 
 MIT
-
