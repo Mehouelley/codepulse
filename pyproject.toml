@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "codepulse-cli"
-version = "0.1.0"
+version = "0.1.1"
 description = "Reveal a codebase's health from its git history — hotspots, bus factor, hidden coupling, and a CI risk gate."
 readme = "README.md"
 requires-python = ">=3.10"
