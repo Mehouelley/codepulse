@@ -1,5 +1,6 @@
 # 🩺 CodePulse
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-CodePulse-2088FF?logo=github&logoColor=white)](https://github.com/marketplace/actions/codepulse-risk-gate)
 [![tests](https://github.com/Mehouelley/codepulse/actions/workflows/tests.yml/badge.svg)](https://github.com/Mehouelley/codepulse/actions/workflows/tests.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
