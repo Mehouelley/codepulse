@@ -63,12 +63,15 @@ def _run_report(repo: str, args: argparse.Namespace) -> int:
     print(f"  {len(commits)} commits")
 
     stats = analyzers.build_file_stats(commits, repo)
+    hot = analyzers.hotspots(stats, limit=args.top)
+    hotspot_paths = {h.path for h in analyzers.hotspots(stats, limit=15)}
     html = render(
         repo_name=os.path.basename(repo.rstrip("/\\")) or repo,
         summary=analyzers.summarize(commits, stats),
-        hotspots=analyzers.hotspots(stats, limit=args.top),
+        hotspots=hot,
         bus_risks=analyzers.bus_factor_risks(stats, limit=args.top),
         coupling=analyzers.coupling(commits, stats, limit=args.top),
+        trend=analyzers.monthly_trend(commits, hotspot_paths),
     )
 
     out = os.path.abspath(args.output)

@@ -119,8 +119,8 @@ simple enough to run in one command.
 - [x] Risk gate: score a change set, JSON output, CI exit code
 - [x] Ignore globs / path filters for generated & data files
 - [x] Post the gate result as a sticky PR comment (GitHub Action)
+- [x] Trend over time (adaptive day/week/month buckets + hotspot-pressure verdict)
 - [ ] Real complexity metrics per language (beyond line count)
-- [ ] Trend over time (is debt rising or falling?)
 
 ## License
 

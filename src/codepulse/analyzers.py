@@ -8,8 +8,9 @@ are secretly coupled.
 
 from __future__ import annotations
 
+import datetime as _dt
 import os
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 
@@ -255,6 +256,90 @@ class Summary:
     first_timestamp: int
     last_timestamp: int
     top_contributors: list[tuple[str, int]]
+
+
+@dataclass
+class TrendBucket:
+    label: str  # bucket key (day, week, or month depending on span)
+    commits: int = 0
+    added: int = 0
+    deleted: int = 0
+    hotspot_commits: int = 0  # commits in this month touching a top hotspot
+    cum_net: int = 0  # cumulative (added - deleted) up to this month
+
+    @property
+    def churn(self) -> int:
+        return self.added + self.deleted
+
+    @property
+    def hotspot_pct(self) -> float:
+        return self.hotspot_commits / self.commits if self.commits else 0.0
+
+
+@dataclass
+class Trend:
+    buckets: list[TrendBucket]
+    verdict: str  # human sentence: is hotspot pressure rising or falling?
+    direction: str  # "up" | "down" | "flat"
+    granularity: str  # "jour" | "semaine" | "mois"
+
+
+def _bucket_key(span_days: float):
+    """Pick day/week/month buckets so short and long histories both read well."""
+    if span_days <= 31:
+        return "jour", lambda ts: _dt.datetime.fromtimestamp(ts).strftime("%m-%d")
+    if span_days <= 180:
+        return "semaine", lambda ts: _dt.datetime.fromtimestamp(ts).strftime("%Y-W%V")
+    return "mois", lambda ts: _dt.datetime.fromtimestamp(ts).strftime("%Y-%m")
+
+
+def monthly_trend(commits: list[Commit], hotspot_paths: set[str], max_buckets: int = 24) -> Trend:
+    """Bucket history over time (granularity auto-picked) and track activity,
+    code size and hotspot pressure."""
+    timestamps = [c.timestamp for c in commits] or [0]
+    span_days = (max(timestamps) - min(timestamps)) / 86400
+    granularity, keyfn = _bucket_key(span_days)
+
+    buckets: dict[str, TrendBucket] = defaultdict(lambda: TrendBucket(label=""))
+    for c in commits:
+        key = keyfn(c.timestamp)
+        b = buckets[key]
+        b.label = key
+        b.commits += 1
+        touched_hot = False
+        for fc in c.files:
+            b.added += fc.added
+            b.deleted += fc.deleted
+            if fc.path in hotspot_paths:
+                touched_hot = True
+        if touched_hot:
+            b.hotspot_commits += 1
+
+    ordered = [buckets[k] for k in sorted(buckets)]
+    running = 0
+    for b in ordered:
+        running += b.added - b.deleted
+        b.cum_net = running
+    ordered = ordered[-max_buckets:]
+
+    direction, verdict = _hotspot_pressure_trend(ordered)
+    return Trend(buckets=ordered, verdict=verdict, direction=direction, granularity=granularity)
+
+
+def _hotspot_pressure_trend(buckets: list[TrendBucket]) -> tuple[str, str]:
+    """Compare recent hotspot pressure to earlier, as a debt signal."""
+    active = [b for b in buckets if b.commits > 0]
+    if len(active) < 4:
+        return "flat", "Pas assez d'historique pour dégager une tendance."
+    half = len(active) // 2
+    early = sum(b.hotspot_pct for b in active[:half]) / half
+    late = sum(b.hotspot_pct for b in active[half:]) / (len(active) - half)
+    delta = late - early
+    if delta > 0.08:
+        return "up", f"⚠️ La pression sur les hotspots augmente ({round(early*100)}% → {round(late*100)}% des commits). La dette se concentre."
+    if delta < -0.08:
+        return "down", f"✅ La pression sur les hotspots diminue ({round(early*100)}% → {round(late*100)}% des commits). Bon signe."
+    return "flat", f"La pression sur les hotspots est stable (~{round(late*100)}% des commits)."
 
 
 def summarize(commits: list[Commit], stats: dict[str, FileStat]) -> Summary:

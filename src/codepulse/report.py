@@ -9,7 +9,8 @@ from __future__ import annotations
 import datetime as _dt
 import html
 
-from .analyzers import CouplingPair, FileStat, Summary
+from . import charts
+from .analyzers import CouplingPair, FileStat, Summary, Trend
 
 
 def _esc(value: object) -> str:
@@ -37,12 +38,32 @@ def _risk_badge(share: float) -> str:
     return f'<span class="badge {cls}">{label}</span>'
 
 
+def _trend_section(trend: Trend) -> str:
+    if not trend or not trend.buckets:
+        return ""
+    commits = [(b.label, b.commits) for b in trend.buckets]
+    size = [(b.label, b.cum_net) for b in trend.buckets]
+    pressure = [(b.label, b.hotspot_pct) for b in trend.buckets]
+    grid = (
+        charts.bars(f"Commits par {trend.granularity}", commits, "accent", charts.fmt_int)
+        + charts.line("Taille du code (lignes cumulées)", size, "accent", charts.fmt_int)
+        + charts.line("Pression hotspots (% commits)", pressure, "hot", charts.fmt_pct)
+    )
+    return f"""<section>
+    <h2>📈 Tendance</h2>
+    <p class="hint">L'évolution dans le temps — l'activité, la croissance du code, et surtout si les changements se concentrent sur les fichiers à risque.</p>
+    <p class="verdict">{_esc(trend.verdict)}</p>
+    <div class="trend-grid">{grid}</div>
+  </section>"""
+
+
 def render(
     repo_name: str,
     summary: Summary,
     hotspots: list[FileStat],
     bus_risks: list[FileStat],
     coupling: list[CouplingPair],
+    trend: Trend | None = None,
 ) -> str:
     generated = _dt.datetime.now().strftime("%Y-%m-%d %H:%M")
     span = f"{_date(summary.first_timestamp)} → {_date(summary.last_timestamp)}"
@@ -91,6 +112,8 @@ def render(
         repo_name=_esc(repo_name),
         generated=generated,
         span=span,
+        chart_css=charts.CHART_CSS,
+        trend_section=_trend_section(trend),
         total_commits=f"{summary.total_commits:,}",
         active_files=f"{summary.active_files:,}",
         tracked_files=f"{summary.tracked_files:,}",
@@ -167,6 +190,7 @@ ul.contrib .c-bar .bar {{ background: var(--accent); }}
 ul.contrib .c-num {{ text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }}
 footer {{ text-align: center; color: var(--muted); font-size: 12px; margin-top: 32px; }}
 footer a {{ color: var(--accent); text-decoration: none; }}
+{chart_css}
 </style>
 </head>
 <body>
@@ -183,6 +207,8 @@ footer a {{ color: var(--accent); text-decoration: none; }}
     <div class="card"><div class="k">Fichiers suivis</div><div class="v">{tracked_files}</div></div>
     <div class="card"><div class="k">Contributeurs</div><div class="v">{contributors}</div></div>
   </div>
+
+  {trend_section}
 
   <section>
     <h2>🔥 Hotspots</h2>
